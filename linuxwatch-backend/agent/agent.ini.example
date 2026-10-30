@@ -1,0 +1,3 @@
+[agent]
+endpoint = https://your-linuxwatch-host/api/v1
+token = lwt_replace_with_the_registration_token

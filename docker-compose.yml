@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: linuxwatch
+      POSTGRES_PASSWORD: lwpassword
+      POSTGRES_DB: linuxwatch
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U linuxwatch -d linuxwatch"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+    networks:
+      - linuxwatch_network
+
+  # 2. FastAPI Backend
+  api:
+    build: 
+      context: ./linuxwatch-backend  # Expects backend code in a folder named 'backend'
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://linuxwatch:lwpassword@db:5432/linuxwatch
+      - LW_SECRET_KEY=supersecretjwtkey_change_in_production
+      - ENCRYPTION_KEY=c3VwZXJzZWNyZXRlbmNyeXB0aW9ua2V5X2NoYW5nZV9pbl9wcm9kdWN0aW9u
+      - ENVIRONMENT=development
+      - AUTO_CREATE_TABLES=true
+      # Allowing CORS from the frontend container and localhost
+      - CORS_ORIGINS=http://localhost,http://localhost:80,http://localhost:5173
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - linuxwatch_network
+
+  # 3. React Frontend
+  frontend:
+    build:
+      context: ./linuxwatch-frontend-live # Expects React code in a folder named 'frontend'
+    ports:
+      - "80:80" # Maps localhost:80 to the Nginx container
+    depends_on:
+      - api
+    networks:
+      - linuxwatch_network
+
+volumes:
+  pgdata:
+
+networks:
+  linuxwatch_network:
+    driver: bridge
